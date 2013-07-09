@@ -16,7 +16,7 @@
  * limitations under the License.
  * 
  * ------------------------------------------------------------------
- * File Name   : RobotiumTask.java
+ * File Name   : RobotiumTaskForViewer.java
  *
  * Created     : 05/06/2013
  */
@@ -54,14 +54,12 @@ public class RobotiumTaskForViewer {
 	public static String PackageName = "";
 	public static String MainActivityName = "";
 	public static String PackageSourceDir = "";
-	public static String[] packinfo = new String[2];
 	public static int VersionCode = -1;
 	protected IDevice adevice = null;
 	private Socket socketg = null;
 	private PrintWriter out = null;
 	private BufferedReader br = null;
 	private ArrayList<String> list;
-	public static int windowOrientation = 0;
 	public static String XmlViews = "";
 
 	private IShellOutputReceiver multiLineReceiver = new MultiLineReceiver() {
@@ -80,32 +78,31 @@ public class RobotiumTaskForViewer {
 		adevice = device;
 	}
 
-	protected String[] executeShellCommand(String cmd, Boolean output) {
-
-		IShellOutputReceiver receiver = null;
+	protected String[] executeShellCommand(String cmd, Boolean output) throws PhoneException {
+		IShellOutputReceiver receiver;
 		list = new ArrayList<String>();
-		if (output) {
-			receiver = multiLineReceiver;
-		}
+		receiver = multiLineReceiver;
+
 		try {
 			adevice.executeShellCommand(cmd, receiver);
-
-		} catch (IOException e) {
-			String result = "";
-			for (String temp : list)
-				result += temp + "\r\n";
 		} catch (TimeoutException e) {
-			String result = "";
-			for (String temp : list)
-				result += temp + "\r\n";
+			Logger.getLogger(this.getClass()).debug(
+					"/****error while executing  : " + cmd + " :" + e.getMessage());
+			throw new PhoneException(e.getMessage());
 		} catch (AdbCommandRejectedException e) {
-			String result = "";
-			for (String temp : list)
-				result += temp + "\r\n";
+			Logger.getLogger(this.getClass()).debug(
+					"/****error  while executing  : " + cmd + " :" + e.getMessage());
+			throw new PhoneException(e.getMessage());
 		} catch (ShellCommandUnresponsiveException e) {
-			String result = "";
-			for (String temp : list)
-				result += temp + "\r\n";
+			Logger.getLogger(this.getClass()).debug(
+					"/****error while executing  : " + cmd + " :" + e.getMessage());
+			if (!cmd.contains("am instrument")) {
+				throw new PhoneException(e.getMessage());
+			}
+		} catch (IOException e) {
+			Logger.getLogger(this.getClass()).debug(
+					"/****error  while executing  : " + cmd + " :" + e.getMessage());
+			throw new PhoneException(e.getMessage());
 		}
 
 		if (output) {
@@ -114,55 +111,27 @@ public class RobotiumTaskForViewer {
 		return null;
 	}
 
-	protected String[] executeShellCommand(String cmd) {
-
-		IShellOutputReceiver receiver;
-		list = new ArrayList<String>();
-		receiver = multiLineReceiver;
-
-		try {
-			adevice.executeShellCommand(cmd, receiver);
-		} catch (TimeoutException e) {
-		} catch (AdbCommandRejectedException e) {
-		} catch (ShellCommandUnresponsiveException e) {
-		} catch (IOException e) {
-		}
-
-		return list.toArray(new String[]{});
-	}
-
 	public String getViewFromRobotium(String cmd) throws PhoneException {
 		if (UiAutomatorViewer.dumpXMLFirstTime) {
-			boolean isPackageInCache = false;
 			Logger.getLogger(this.getClass()).debug("/****Robotium Prepares XMl DUMP FILE ***/ ");
 			if (checkRobotium("com.orange.atk.serviceSendEventToSolo") != 0) {
 				pushSendEventService();
 			}
 
 			getForegroundApp();
-			try {
-				isPackageInCache = PrepareApkForRobotiumTest.prepareAPKForRobotiumGetViews(adevice,
-						PackageName, MainActivityName, PackageSourceDir,
-						"ATKGetViewAPKWithRobotium.apk", VersionCode);
-			} catch (PhoneException e) {
-				Logger.getLogger(this.getClass()).debug("/****error : " + e.getMessage(), e);
-				throw new PhoneException(e.getMessage());
-			}
+			PrepareApkForRobotiumTest.prepareAPKForRobotiumGetViews(adevice, PackageName,
+					MainActivityName, PackageSourceDir, "ATKGetViewAPKWithRobotium.apk",
+					VersionCode);
 			pushATKGetViewsSolo();
 
-			String Scommand = "am instrument -w  com.orange.atk.soloGetViews/android.test.InstrumentationTestRunner";
+			String Scommand = "am instrument -w com.orange.atk.soloGetViews/android.test.InstrumentationTestRunner";
 			float version = Float.valueOf(adevice.getProperty("ro.build.version.release")
 					.substring(0, 3));
 			if (version >= 3.1) {
 				Scommand += " -f 32";
 			}
-			executeShellCommand(Scommand);
-			try {
-				Thread.sleep(10000);
-			} catch (InterruptedException e2) {
-				Logger.getLogger(this.getClass()).debug("/****error : " + e2.getMessage());
-				throw new PhoneException(e2.getMessage());
-			}
+
+			executeShellCommand(Scommand, false);
 
 			try {
 				adevice.createForward(PORT_ATK_SOLO_GET_VIEWS, PORT_ATK_SOLO_GET_VIEWS);
@@ -213,6 +182,7 @@ public class RobotiumTaskForViewer {
 				} else {
 					out.println(cmd);
 					out.flush();
+
 					XmlViews = br.readLine();
 					Logger.getLogger(this.getClass()).debug(
 							"/****UiAutomatorHelper.getUiHierarchyFile***/" + XmlViews);
@@ -227,8 +197,7 @@ public class RobotiumTaskForViewer {
 
 	}
 
-	private int checkRobotium(String packg) {
-
+	private int checkRobotium(String packg) throws PhoneException {
 		String startCmd = "pm list packages";
 		String[] result = executeShellCommand(startCmd, true);
 		for (String res : result) {
@@ -261,12 +230,7 @@ public class RobotiumTaskForViewer {
 		}
 	}
 
-	/**
-	 * 
-	 * @throws PhoneException
-	 */
 	private void pushSendEventService() throws PhoneException {
-		// monitorR.subTask("Install on device the Service which Communicates with Robotium Test Project");
 		try {
 			String result = adevice.uninstallPackage(" com.orange.atk.serviceSendEventToSolo");
 			if (result != null) {
@@ -284,7 +248,6 @@ public class RobotiumTaskForViewer {
 
 		}
 	}
-
 	public ArrayList<String> getForegroundApp() throws PhoneException {
 		if (checkRobotium("com.orange.atk.serviceSendEventToSolo") != 0) {
 			pushSendEventService();
@@ -295,7 +258,7 @@ public class RobotiumTaskForViewer {
 				3));
 		if (version >= 3.1)
 			Scommand += " -f 32";
-		executeShellCommand(Scommand);
+		executeShellCommand(Scommand, false);
 		try {
 			Thread.sleep(2000);
 		} catch (InterruptedException e2) {
@@ -308,21 +271,23 @@ public class RobotiumTaskForViewer {
 			adevice.createForward(PORT_ATK_SOLO_GET_FOREGROUND_APP,
 					PORT_ATK_SOLO_GET_FOREGROUND_APP);
 		} catch (TimeoutException e) {
-			Logger.getLogger(this.getClass()).debug("/****error : " + e.getMessage());
+			Logger.getLogger(this.getClass()).debug(
+					"/****error while forwarding : " + e.getMessage());
 			throw new PhoneException(e.getMessage());
 
 		} catch (AdbCommandRejectedException e) {
-			Logger.getLogger(this.getClass()).debug("/****error : " + e.getMessage());
+			Logger.getLogger(this.getClass()).debug(
+					"/****error while forwarding : " + e.getMessage());
 			throw new PhoneException(e.getMessage());
 
 		} catch (IOException e) {
-			Logger.getLogger(this.getClass()).debug("/****error : " + e.getMessage());
+			Logger.getLogger(this.getClass()).debug(
+					"/****error while forwarding : " + e.getMessage());
 			throw new PhoneException(e.getMessage());
 
 		}
 
 		try {
-
 			Socket socketg = new Socket("127.0.0.1", PORT_ATK_SOLO_GET_FOREGROUND_APP);
 			ObjectOutputStream out = new ObjectOutputStream(socketg.getOutputStream());
 			ObjectInputStream in = new ObjectInputStream(socketg.getInputStream());
@@ -332,13 +297,21 @@ public class RobotiumTaskForViewer {
 			out.close();
 			in.close();
 			socketg.close();
-			PackageName = Apk.get(0);
-			MainActivityName = Apk.get(1);
-			PackageSourceDir = Apk.get(2);
-			VersionCode = Integer.parseInt(Apk.get(3));
-			Logger.getLogger(this.getClass()).debug(" " + PackageName);
-			Logger.getLogger(this.getClass()).debug(" " + MainActivityName);
-			Logger.getLogger(this.getClass()).debug(" " + PackageSourceDir);
+			if (Apk.size() == 4) {
+				PackageName = Apk.get(0);
+				MainActivityName = Apk.get(1);
+				PackageSourceDir = Apk.get(2);
+				VersionCode = Integer.parseInt(Apk.get(3));
+				Logger.getLogger(this.getClass()).debug(" " + PackageName);
+				Logger.getLogger(this.getClass()).debug(" " + MainActivityName);
+				Logger.getLogger(this.getClass()).debug(" " + PackageSourceDir);
+			} else {
+				Logger.getLogger(this.getClass()).debug("/**** Can get apk to test :***/ ");
+				JOptionPane.showMessageDialog(UiAutomatorHelper.mViewer,
+						"Can't get all needed informations about apk from device", "Warning",
+						JOptionPane.WARNING_MESSAGE);
+				throw new PhoneException("Can't get all needed informations about apk from device");
+			}
 			if (PackageSourceDir.toLowerCase().startsWith("/system/")) {
 				Logger.getLogger(this.getClass()).debug(
 						"/**** Can not perform robotium test on system app :***/ ");
@@ -347,7 +320,6 @@ public class RobotiumTaskForViewer {
 						JOptionPane.WARNING_MESSAGE);
 				throw new PhoneException("Can perform robotium test on system app");
 			}
-
 		} catch (UnknownHostException e) {
 			Logger.getLogger(this.getClass()).debug("error : " + e.getMessage(), e);
 			throw new PhoneException(e.getMessage());
@@ -361,5 +333,4 @@ public class RobotiumTaskForViewer {
 		}
 		return Apk;
 	}
-
 }

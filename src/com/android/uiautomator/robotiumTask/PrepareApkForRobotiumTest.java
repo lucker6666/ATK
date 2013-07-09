@@ -18,11 +18,16 @@
  * ------------------------------------------------------------------
  * File Name   : PrepareApkForRobotiumTest.java
  *
+<<<<<<< HEAD
  * Created     : 05/06/2013
 <<<<<<< HEAD
 =======
  * Author(s)   : D'ALMEIDA Joana
 >>>>>>> addingUiAutomatorViewerRobotiumVersion
+=======
+ * Created     : 05/06/2013
+ * Author(s)   : D'ALMEIDA Joana
+>>>>>>> 5a8bfc5eafcd86140fd1eed1a4edad98e46fd331
  */
 package com.android.uiautomator.robotiumTask;
 
@@ -48,7 +53,7 @@ import com.orange.atk.platform.Platform;
 
 public class PrepareApkForRobotiumTest {
 
-	public static boolean prepareAPKForRobotiumGetViews(IDevice adevice, String packName,
+	public static void prepareAPKForRobotiumGetViews(IDevice adevice, String packName,
 			String activityName, String packsourceDir, String TestAPK, int versionCode)
 			throws PhoneException {
 		Logger.getLogger(PrepareApkForRobotiumTest.class).debug(
@@ -78,7 +83,12 @@ public class PrepareApkForRobotiumTest {
 
 		BufferedReader errorStream = null;
 		BufferedReader inputStream = null;
-
+		if (!(new File(TestDir).exists())) {
+			(new File(TestDir)).mkdir();
+		}
+		if (!(new File(TestDir + Platform.FILE_SEPARATOR + "TempAPK").exists())) {
+			(new File(TestDir + Platform.FILE_SEPARATOR + "TempAPK")).mkdir();
+		}
 		String[] pullapk = {adbLocation, "-s", adevice.getSerialNumber(), "pull", packsourceDir,
 				TestDir};
 		if (!packageExistInCache) {
@@ -114,7 +124,9 @@ public class PrepareApkForRobotiumTest {
 					"/****error : " + e.getMessage());
 			throw new PhoneException(e.getMessage());
 		}
+
 		createInitFile(TempInitFile, activityName, packName);
+
 		String buildAndSignTestApk[] = {createAndbuildTestApkFile, TempTestApkDir,
 				TestDir + Platform.FILE_SEPARATOR + "TempAPK" + Platform.FILE_SEPARATOR + TestAPK,
 				packName};
@@ -132,6 +144,15 @@ public class PrepareApkForRobotiumTest {
 					"/****error : " + e1.getMessage());
 			throw new PhoneException(e1.getMessage());
 		}
+
+		try {
+			copyFolder(new File(testApkSrcDir), new File(TempTestApkDir));
+		} catch (IOException e) {
+			Logger.getLogger(PrepareApkForRobotiumTest.class).debug(
+					"/****error : " + e.getMessage());
+			throw new PhoneException(e.getMessage());
+		}
+
 		if (!packageExistInCache) {
 
 			String appapk = packsourceDir.substring(packsourceDir.lastIndexOf("/") + 1);
@@ -182,12 +203,8 @@ public class PrepareApkForRobotiumTest {
 			String appapk = packsourceDir.substring(packsourceDir.lastIndexOf("/") + 1);
 			pushPackage(adevice, packName, apkPath + Platform.FILE_SEPARATOR + appapk);
 		}
-
 		removeDirectory(new File(TempTestApkDir));
-		return true;
-
 	}
-
 	protected static void removeDirectory(File dir) {
 		if (dir.exists()) {
 			if (dir.isDirectory()) {
@@ -286,7 +303,7 @@ public class PrepareApkForRobotiumTest {
 	public static void copyFolder(File src, File dest) throws IOException {
 		if (src.isDirectory()) {
 			if (!dest.exists()) {
-				dest.mkdir();
+				dest.mkdirs();
 			}
 			String files[] = src.list();
 			for (String file : files) {
@@ -306,7 +323,6 @@ public class PrepareApkForRobotiumTest {
 			out.close();
 		}
 	}
-
 	private static void pushPackage(IDevice adevice, String PackageName, String apkDir)
 			throws PhoneException {
 		Logger.getLogger(PrepareApkForRobotiumTest.class).debug("reinstalling pack " + PackageName);
